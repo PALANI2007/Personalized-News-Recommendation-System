@@ -1,4 +1,6 @@
 venv/
 __pycache__/
 *.pyc
-.ipynb_checkpoints/
+
+models/similarity.pkl
+models/tfidf_vectorizer.pkl
