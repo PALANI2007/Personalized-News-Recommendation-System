@@ -40,7 +40,7 @@ function SimilarityRing({ percent }) {
 }
 
 const SAMPLE_HEADLINES = [
-  "Oil Drops Below $42 a Barrel",
+  "Crude oil prices continue decline",
   "Manchester United cruise into Champions League",
   "Apple's New iMac Computer Is All Display",
   "OPEC Increases Oil Output",

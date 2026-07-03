@@ -173,9 +173,9 @@ def recommend_news():
     t_start = time.time()
     matches = df[df["Title"].str.lower() == title.lower()]
     if matches.empty:
-        matches = df[df["Title"].str.lower().str.contains(title.lower(), na=False)]
+        matches = df[df["Title"].str.lower().str.contains(title.lower(), regex=False, na=False)]
     if matches.empty:
-        return jsonify({"error": "News Title Not Found", "message": "No exact or partial match found."}), 404
+        return jsonify({"error": "News Title Not Found", "message": "No exact or partial match found. Please try another title."}), 404
 
     idx = matches.index[0]
     matched_article = df.loc[idx].to_dict()
