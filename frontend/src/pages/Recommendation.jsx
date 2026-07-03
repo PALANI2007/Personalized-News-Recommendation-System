@@ -40,11 +40,11 @@ function SimilarityRing({ percent }) {
 }
 
 const SAMPLE_HEADLINES = [
-  "Oil and Economy Cloud OPEC's Meeting",
-  "Real Madrid Wins Champions League Final",
-  "NASA Rover Finds Evidence of Ancient Water",
-  "Wall Street Stocks Rally Amid Low Inflation",
-  "Apple Announces New M3 Chip Series",
+  "Oil Drops Below $42 a Barrel",
+  "Manchester United cruise into Champions League",
+  "Apple's New iMac Computer Is All Display",
+  "OPEC Increases Oil Output",
+  "Microsoft to make foray into online music (SiliconValley.com)",
 ];
 
 export default function Recommendation() {
