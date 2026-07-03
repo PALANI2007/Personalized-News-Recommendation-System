@@ -1,0 +1,20 @@
+Project Name:
+Personalized News Recommendation System
+
+Algorithm:
+Logistic Regression
+
+Feature Engineering:
+TF-IDF
+
+Accuracy:
+88.68%
+
+Dataset Size:
+7600 Records
+
+Training:
+80%
+
+Testing:
+20%
