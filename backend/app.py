@@ -8,6 +8,7 @@ from flask import Flask, jsonify, request, send_file
 from flask_cors import CORS
 
 # ReportLab imports for PDF generation
+from sklearn.metrics.pairwise import cosine_similarity
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -52,14 +53,12 @@ DATASET_PATH = resolve_path(os.path.join("dataset", "cleaned", "news_with_catego
 MODEL_PATH = resolve_path(os.path.join("models", "news_model.pkl"))
 TFIDF_PATH = resolve_path(os.path.join("models", "tfidf.pkl"))
 TFIDF_VECT_PATH = resolve_path(os.path.join("models", "tfidf_vectorizer.pkl"))
-SIMILARITY_PATH = resolve_path(os.path.join("models", "similarity.pkl"))
 REPORTS_DIR = resolve_path("reports")
 
 # Global variables
 df = None
 tfidf_vectorizer = None
 tfidf_matrix_global = None
-similarity_matrix = None
 model = None
 init_error = None  # Track initialization errors
 
@@ -73,7 +72,7 @@ CONFUSION_MATRIX = [
 ]
 
 def init_app():
-    global df, tfidf_vectorizer, tfidf_matrix_global, similarity_matrix, model, init_error
+    global df, tfidf_vectorizer, tfidf_matrix_global, model, init_error
     print("=== Initializing News Recommendation System Backend ===")
     print(f"  BACKEND_DIR: {BACKEND_DIR}")
     print(f"  BASE_DIR:    {BASE_DIR}")
@@ -109,15 +108,12 @@ def init_app():
         tfidf_vectorizer = TfidfVectorizer(stop_words="english")
         tfidf_vectorizer.fit(df["text"])
 
-    print("Loading Similarity Matrix...")
+    
+    print("Generating TF-IDF Matrix...")
 
-    if os.path.exists(SIMILARITY_PATH):
-        similarity_matrix = joblib.load(SIMILARITY_PATH)
-        print(f"Similarity Matrix Loaded: {similarity_matrix.shape}")
-    else:
-        raise FileNotFoundError(f"Similarity file not found: {SIMILARITY_PATH}")
+    tfidf_matrix_global = tfidf_vectorizer.transform(df["text"])
 
-    tfidf_matrix_global = None
+    print("TF-IDF Matrix Shape :", tfidf_matrix_global.shape)
 
     init_error = None
     print("=== Initialization Completed ===\n")
@@ -140,7 +136,7 @@ def index():
         "message": "Personalized News Recommendation System API",
         "dataset_records": len(df) if df is not None else 0,
         "model_loaded": model is not None,
-        "similarity_loaded": similarity_matrix is not None,
+        "similarity_loaded": tfidf_matrix_global is not None,
         "init_error": init_error
     })
 
@@ -216,7 +212,7 @@ def search_news():
 
 @app.route("/api/recommend", methods=["POST"])
 def recommend_news():
-    if df is None or similarity_matrix is None:
+    if df is None or tfidf_matrix_global is None:
         return jsonify({"error": "Dataset or recommendation matrix not initialized", "init_error": init_error}), 500
     data = request.get_json()
     if not data or "title" not in data:
@@ -232,8 +228,18 @@ def recommend_news():
 
     idx = matches.index[0]
     matched_article = df.loc[idx].to_dict()
-    similarity_scores = sorted(list(enumerate(similarity_matrix[idx])), key=lambda x: x[1], reverse=True)
+    query_vector = tfidf_matrix_global[idx]
 
+    scores = cosine_similarity(
+        query_vector,
+        tfidf_matrix_global
+    ).flatten()
+
+    similarity_scores = sorted(
+        list(enumerate(scores)),
+        key=lambda x: x[1],
+        reverse=True
+    )
     recommendations = []
     seen_titles = {matched_article["Title"].lower()}
     for item in similarity_scores:
@@ -334,7 +340,7 @@ def get_dashboard():
 
     model_size_kb = round(os.path.getsize(MODEL_PATH) / 1024, 1) if os.path.exists(MODEL_PATH) else 0
     dataset_size_kb = round(os.path.getsize(DATASET_PATH) / 1024, 1) if os.path.exists(DATASET_PATH) else 0
-    similarity_matrix_mb = round(similarity_matrix.nbytes / (1024 * 1024), 1) if similarity_matrix is not None else 0
+    similarity_matrix_mb = 0 if similarity_matrix is not None else 0
 
     return jsonify({
         "total_articles": len(df),
