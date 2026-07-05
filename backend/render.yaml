@@ -12,5 +12,5 @@ services:
       - key: PORT
         value: 5000
       - key: FRONTEND_URL
-        value: https://personalized-news-recommendation-system.vercel.app
+        value: https://personalized-news-recommendation-sy-sable.vercel.app
     plan: free
