@@ -6,7 +6,6 @@ import numpy as np
 import joblib
 from flask import Flask, jsonify, request, send_file
 from flask_cors import CORS
-from sklearn.metrics.pairwise import cosine_similarity
 
 # ReportLab imports for PDF generation
 from reportlab.lib.pagesizes import letter
@@ -53,6 +52,7 @@ DATASET_PATH = resolve_path(os.path.join("dataset", "cleaned", "news_with_catego
 MODEL_PATH = resolve_path(os.path.join("models", "news_model.pkl"))
 TFIDF_PATH = resolve_path(os.path.join("models", "tfidf.pkl"))
 TFIDF_VECT_PATH = resolve_path(os.path.join("models", "tfidf_vectorizer.pkl"))
+SIMILARITY_PATH = resolve_path(os.path.join("models", "similarity.pkl"))
 REPORTS_DIR = resolve_path("reports")
 
 # Global variables
@@ -109,12 +109,16 @@ def init_app():
         tfidf_vectorizer = TfidfVectorizer(stop_words="english")
         tfidf_vectorizer.fit(df["text"])
 
-    print("Generating TF-IDF matrices...")
-    tfidf_matrix_global = tfidf_vectorizer.transform(df["text"])
+    print("Loading Similarity Matrix...")
 
-    print("Computing Cosine Similarity Matrix...")
-    similarity_matrix = cosine_similarity(tfidf_matrix_global)
-    print(f"Similarity Matrix Shape: {similarity_matrix.shape}")
+    if os.path.exists(SIMILARITY_PATH):
+        similarity_matrix = joblib.load(SIMILARITY_PATH)
+        print(f"Similarity Matrix Loaded: {similarity_matrix.shape}")
+    else:
+        raise FileNotFoundError(f"Similarity file not found: {SIMILARITY_PATH}")
+
+    tfidf_matrix_global = None
+
     init_error = None
     print("=== Initialization Completed ===\n")
 
