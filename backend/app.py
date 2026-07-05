@@ -99,7 +99,9 @@ def init_app():
         model = joblib.load(MODEL_PATH)
 
     if os.path.exists(TFIDF_VECT_PATH):
+        print("Loading:", TFIDF_VECT_PATH)
         tfidf_vectorizer = joblib.load(TFIDF_VECT_PATH)
+        print("Vocabulary Exists:", hasattr(tfidf_vectorizer, "vocabulary_"))
     elif os.path.exists(TFIDF_PATH):
         tfidf_vectorizer = joblib.load(TFIDF_PATH)
     else:
