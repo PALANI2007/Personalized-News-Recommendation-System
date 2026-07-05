@@ -322,48 +322,56 @@ def serve_report_image(filename):
     return send_file(img_path, mimetype="image/png")
 
 @app.route("/api/dashboard", methods=["GET"])
+
 def get_dashboard():
-    """Extended dashboard metrics including vocabulary, TF-IDF features, model size."""
-    if df is None:
-        return jsonify({"error": "Dataset not loaded", "init_error": init_error}), 500
+    try:
+        """Extended dashboard metrics including vocabulary, TF-IDF features, model size."""
+        if df is None:
+            return jsonify({"error": "Dataset not loaded", "init_error": init_error}), 500
 
-    word_counts = df["Description"].apply(lambda x: len(str(x).split()))
+        word_counts = df["Description"].apply(lambda x: len(str(x).split()))
 
-    vocab_size = 0
-    tfidf_features = 0
-    if tfidf_vectorizer is not None:
-        try:
-            vocab_size = len(tfidf_vectorizer.vocabulary_)
-            tfidf_features = tfidf_matrix_global.shape[1] if tfidf_matrix_global is not None else vocab_size
-        except Exception:
-            pass
+        vocab_size = 0
+        tfidf_features = 0
+        if tfidf_vectorizer is not None:
+            try:
+                vocab_size = len(tfidf_vectorizer.vocabulary_)
+                tfidf_features = tfidf_matrix_global.shape[1] if tfidf_matrix_global is not None else vocab_size
+            except Exception:
+                pass
 
-    model_size_kb = round(os.path.getsize(MODEL_PATH) / 1024, 1) if os.path.exists(MODEL_PATH) else 0
-    dataset_size_kb = round(os.path.getsize(DATASET_PATH) / 1024, 1) if os.path.exists(DATASET_PATH) else 0
-    similarity_matrix_mb = 0 if similarity_matrix is not None else 0
+        model_size_kb = round(os.path.getsize(MODEL_PATH) / 1024, 1) if os.path.exists(MODEL_PATH) else 0
+        dataset_size_kb = round(os.path.getsize(DATASET_PATH) / 1024, 1) if os.path.exists(DATASET_PATH) else 0
+        similarity_matrix_mb = 0
+        return jsonify({
+            "total_articles": len(df),
+            "total_categories": df["Category"].nunique(),
+            "model_accuracy": MODEL_ACCURACY,
+            "vocabulary_size": vocab_size,
+            "avg_description_length": round(word_counts.mean(), 1),
+            "tfidf_features": tfidf_features,
+            "model_size_kb": model_size_kb,
+            "dataset_size_kb": dataset_size_kb,
+            "similarity_matrix_mb": similarity_matrix_mb,
+            "category_distribution": df["Category"].value_counts().to_dict(),
+            "radar_data": [
+                {"category": "World", "precision": 88, "recall": 89, "f1": 88},
+                {"category": "Sports", "precision": 93, "recall": 97, "f1": 95},
+                {"category": "Business", "precision": 86, "recall": 84, "f1": 85},
+                {"category": "Sci & Tech", "precision": 87, "recall": 84, "f1": 86},
+            ],
+            "split_data": [
+                {"name": "Training (80%)", "value": 6080},
+                {"name": "Testing (20%)", "value": 1520}
+            ]
+        })
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
 
-    return jsonify({
-        "total_articles": len(df),
-        "total_categories": df["Category"].nunique(),
-        "model_accuracy": MODEL_ACCURACY,
-        "vocabulary_size": vocab_size,
-        "avg_description_length": round(word_counts.mean(), 1),
-        "tfidf_features": tfidf_features,
-        "model_size_kb": model_size_kb,
-        "dataset_size_kb": dataset_size_kb,
-        "similarity_matrix_mb": similarity_matrix_mb,
-        "category_distribution": df["Category"].value_counts().to_dict(),
-        "radar_data": [
-            {"category": "World", "precision": 88, "recall": 89, "f1": 88},
-            {"category": "Sports", "precision": 93, "recall": 97, "f1": 95},
-            {"category": "Business", "precision": 86, "recall": 84, "f1": 85},
-            {"category": "Sci & Tech", "precision": 87, "recall": 84, "f1": 86},
-        ],
-        "split_data": [
-            {"name": "Training (80%)", "value": 6080},
-            {"name": "Testing (20%)", "value": 1520}
-        ]
-    })
+        return jsonify({
+            "error": str(e)
+        }), 500
 
 @app.route("/api/dataset", methods=["GET"])
 def get_dataset():
