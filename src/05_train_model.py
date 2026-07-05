@@ -29,6 +29,6 @@ model.fit(X_train, y_train)
 
 # Save Model
 joblib.dump(model, "models/news_model.pkl")
-joblib.dump(tfidf, "models/tfidf.pkl")
+joblib.dump(tfidf, "models/tfidf_vectorizer.pkl")
 
 print("Model Training Completed")
