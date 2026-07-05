@@ -1,13 +1,17 @@
 import axios from 'axios';
 
-// Use production endpoint if deployed, else fallback to local Flask server
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+// ─── API Base URL ─────────────────────────────────────────────────────────────
+// In production (Vercel), VITE_API_BASE_URL is baked in from .env.production
+// In development, it reads from .env.development (http://localhost:5000/api)
+// The fallback ensures local dev works even without a .env file
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
   },
+  timeout: 30000, // 30s timeout for Render cold starts (free tier spins down)
 });
 
 // ─── Core API Calls ───────────────────────────────────────────────────────────

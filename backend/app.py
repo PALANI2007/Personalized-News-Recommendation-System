@@ -15,15 +15,45 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 
 app = Flask(__name__)
-CORS(app)
 
-# Resolve directories relative to app.py
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DATASET_PATH = os.path.join(BASE_DIR, "dataset", "cleaned", "news_with_category.csv")
-MODEL_PATH = os.path.join(BASE_DIR, "models", "news_model.pkl")
-TFIDF_PATH = os.path.join(BASE_DIR, "models", "tfidf.pkl")
-TFIDF_VECT_PATH = os.path.join(BASE_DIR, "models", "tfidf_vectorizer.pkl")
-REPORTS_DIR = os.path.join(BASE_DIR, "reports")
+# ─── CORS Configuration ───────────────────────────────────────────────────────
+# Allow Vercel frontend + localhost for development
+FRONTEND_URL = os.environ.get("FRONTEND_URL", "*")
+CORS(app, resources={r"/*": {"origins": [
+    FRONTEND_URL,
+    "http://localhost:3000",
+    "http://localhost:5173",
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:5173",
+]}})
+
+# ─── Path Resolution ──────────────────────────────────────────────────────────
+# Works both locally (running from backend/) and on Render
+# On Render with rootDirectory=backend, __file__ is /opt/render/project/src/app.py
+# and dataset/models/reports are one level up at the repo root
+BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = os.path.dirname(BACKEND_DIR)  # repo root
+
+# Check if dataset exists at repo root level, otherwise check relative to backend
+def resolve_path(relative_path):
+    """Try repo-root first, then backend dir, then current working directory."""
+    candidates = [
+        os.path.join(BASE_DIR, relative_path),
+        os.path.join(BACKEND_DIR, relative_path),
+        os.path.join(os.getcwd(), relative_path),
+        os.path.join(os.path.dirname(os.getcwd()), relative_path),
+    ]
+    for path in candidates:
+        if os.path.exists(path):
+            return path
+    # Return the first candidate (repo root) as default even if not found
+    return candidates[0]
+
+DATASET_PATH = resolve_path(os.path.join("dataset", "cleaned", "news_with_category.csv"))
+MODEL_PATH = resolve_path(os.path.join("models", "news_model.pkl"))
+TFIDF_PATH = resolve_path(os.path.join("models", "tfidf.pkl"))
+TFIDF_VECT_PATH = resolve_path(os.path.join("models", "tfidf_vectorizer.pkl"))
+REPORTS_DIR = resolve_path("reports")
 
 # Global variables
 df = None
@@ -31,6 +61,7 @@ tfidf_vectorizer = None
 tfidf_matrix_global = None
 similarity_matrix = None
 model = None
+init_error = None  # Track initialization errors
 
 # Pre-computed static stats
 MODEL_ACCURACY = 88.68
@@ -42,11 +73,19 @@ CONFUSION_MATRIX = [
 ]
 
 def init_app():
-    global df, tfidf_vectorizer, tfidf_matrix_global, similarity_matrix, model
+    global df, tfidf_vectorizer, tfidf_matrix_global, similarity_matrix, model, init_error
     print("=== Initializing News Recommendation System Backend ===")
+    print(f"  BACKEND_DIR: {BACKEND_DIR}")
+    print(f"  BASE_DIR:    {BASE_DIR}")
+    print(f"  CWD:         {os.getcwd()}")
+    print(f"  DATASET:     {DATASET_PATH}")
+    print(f"  MODEL:       {MODEL_PATH}")
+    print(f"  TFIDF:       {TFIDF_VECT_PATH}")
+    print(f"  REPORTS:     {REPORTS_DIR}")
 
     if not os.path.exists(DATASET_PATH):
-        raise FileNotFoundError(f"Dataset CSV not found at {DATASET_PATH}")
+        init_error = f"Dataset CSV not found at {DATASET_PATH}"
+        raise FileNotFoundError(init_error)
 
     print(f"Loading dataset from: {DATASET_PATH}")
     df = pd.read_csv(DATASET_PATH)
@@ -74,12 +113,14 @@ def init_app():
     print("Computing Cosine Similarity Matrix...")
     similarity_matrix = cosine_similarity(tfidf_matrix_global)
     print(f"Similarity Matrix Shape: {similarity_matrix.shape}")
+    init_error = None
     print("=== Initialization Completed ===\n")
 
 try:
     init_app()
 except Exception as e:
-    print(f"Error during initialization: {str(e)}")
+    init_error = str(e)
+    print(f"Error during initialization: {init_error}")
 
 # ====================================================
 # API ROUTES
@@ -93,20 +134,26 @@ def index():
         "message": "Personalized News Recommendation System API",
         "dataset_records": len(df) if df is not None else 0,
         "model_loaded": model is not None,
-        "similarity_loaded": similarity_matrix is not None
+        "similarity_loaded": similarity_matrix is not None,
+        "init_error": init_error
     })
+
+@app.route("/health", methods=["GET"])
+def health_check():
+    """Health check endpoint for Render."""
+    return jsonify({"status": "healthy", "init_error": init_error}), 200
 
 @app.route("/api/categories", methods=["GET"])
 def get_categories():
     if df is None:
-        return jsonify({"error": "Dataset not loaded"}), 500
+        return jsonify({"error": "Dataset not loaded", "init_error": init_error}), 500
     categories = sorted(df["Category"].unique().tolist())
     return jsonify({"categories": categories})
 
 @app.route("/api/statistics", methods=["GET"])
 def get_statistics():
     if df is None:
-        return jsonify({"error": "Dataset not loaded"}), 500
+        return jsonify({"error": "Dataset not loaded", "init_error": init_error}), 500
     word_counts = df["Description"].apply(lambda x: len(str(x).split()))
     cat_distribution = df["Category"].value_counts().to_dict()
     missing_vals = int(df.isnull().sum().sum())
@@ -130,7 +177,7 @@ def get_statistics():
 @app.route("/api/search", methods=["GET"])
 def search_news():
     if df is None:
-        return jsonify({"error": "Dataset not loaded"}), 500
+        return jsonify({"error": "Dataset not loaded", "init_error": init_error}), 500
     keyword = request.args.get("keyword", "").strip()
     category = request.args.get("category", "").strip()
     page = max(1, int(request.args.get("page", 1)))
@@ -164,7 +211,7 @@ def search_news():
 @app.route("/api/recommend", methods=["POST"])
 def recommend_news():
     if df is None or similarity_matrix is None:
-        return jsonify({"error": "Dataset or recommendation matrix not initialized"}), 500
+        return jsonify({"error": "Dataset or recommendation matrix not initialized", "init_error": init_error}), 500
     data = request.get_json()
     if not data or "title" not in data:
         return jsonify({"error": "Missing title in request body"}), 400
@@ -266,7 +313,7 @@ def serve_report_image(filename):
 def get_dashboard():
     """Extended dashboard metrics including vocabulary, TF-IDF features, model size."""
     if df is None:
-        return jsonify({"error": "Dataset not loaded"}), 500
+        return jsonify({"error": "Dataset not loaded", "init_error": init_error}), 500
 
     word_counts = df["Description"].apply(lambda x: len(str(x).split()))
 
@@ -310,7 +357,7 @@ def get_dashboard():
 def get_dataset():
     """Dataset preview with pagination and random sample."""
     if df is None:
-        return jsonify({"error": "Dataset not loaded"}), 500
+        return jsonify({"error": "Dataset not loaded", "init_error": init_error}), 500
 
     page = max(1, int(request.args.get("page", 1)))
     limit = min(int(request.args.get("limit", 10)), 50)

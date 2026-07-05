@@ -4,3 +4,11 @@ __pycache__/
 
 models/similarity.pkl
 models/tfidf_vectorizer.pkl
+
+# Environment files (secrets)
+.env
+.env.local
+
+# Keep .env.production and .env.development tracked (they contain public URLs only)
+!frontend/.env.production
+!frontend/.env.development

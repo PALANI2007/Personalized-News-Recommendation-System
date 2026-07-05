@@ -35,8 +35,8 @@ export const STATIC_STATS = {
   testingSet: 1520,
 };
 
-// ─── API Base URL ────────────────────────────────────────────────
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+// ─── API Base URL (re-exported from api.js — single source of truth) ────────
+export { API_BASE_URL } from './api';
 
 // ─── Page Metadata for SEO ──────────────────────────────────────
 export const PAGE_META = {
